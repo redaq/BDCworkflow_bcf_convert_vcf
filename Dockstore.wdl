@@ -9,8 +9,7 @@ workflow BCFConvertVCF{
 
 	input {
 		Array[File] bcf_list
-		String  vcf_output
-		#File  subj_list
+		File? subj_list
 		Boolean filterPass = true ### whether to filter down to variants with PASS status
 		Int min_mac = 0 ### Whether to filter out variants with mac < min_mac_in, 0 means no filter.
 		Int mem_gb = 5 
@@ -21,8 +20,7 @@ workflow BCFConvertVCF{
 		call convert {
 			input:
 			bcf_list_in = bcf_file,
-			vcf_output_in = vcf_output,
-			#subj_list_in = subj_list,
+			subj_list_in = subj_list,
 			cores_in = cores,
 			disk_in = disk,
 			mem_gb_in = mem_gb,
@@ -30,11 +28,10 @@ workflow BCFConvertVCF{
 			min_mac_in = min_mac
 			
 		}
-		File vcf_out = convert.convert_vcf
 	}	
 
 	output {
-		Array[File] vcf_outs = vcf_out 
+		Array[File] vcf_outs = convert.convert_vcf
 	}
 }
 
@@ -42,8 +39,7 @@ workflow BCFConvertVCF{
 task convert {
 	input {
 		File bcf_list_in
-		String vcf_output_in
-		#File subj_list_in
+		File? subj_list_in
 		Boolean filterPass_in
 		Int min_mac_in
 		Int cores_in
@@ -51,30 +47,43 @@ task convert {
 		Int mem_gb_in
 	}
 	command { 
+	# Set the exit code of a pipeline to that of the rightmost command
+	# to exit with a non-zero status, or zero if all commands of the pipeline exit
 	set -eux -o pipefail
 
+	vcf_output_in=$(basename "${bcf_list_in}" .bcf)
+	echo $vcf_output_in
+
 	## prepare
-	if [ ~{filterPass_in} == true ]; then
-		bcftools view -O z -f .,PASS -o ~{vcf_output_in}_tmp.vcf.gz ~{bcf_list_in} 
+	if [ ${default="NONE" subj_list_in} == "NONE" ]; then
+		if [ ~{filterPass_in} == true ]; then
+			bcftools view -O z -f .,PASS -o $vcf_output_in.vcf.gz.tmp ~{bcf_list_in} 
+		else
+			bcftools view -O z -o $vcf_output_in.tmp.vcf.gz.tmp ~{bcf_list_in}
+		fi
 	else
-		bcftools view -O z -o ~{vcf_output_in}_tmp.vcf.gz ~{bcf_list_in}
+		if [ ~{filterPass_in} == true ]; then
+			bcftools view -O z -S ~{subj_list_in} -f .,PASS -o $vcf_output_in.vcf.gz.tmp ~{bcf_list_in}
+		else
+			bcftools view -O z -S ~{subj_list_in} -o $vcf_output_in.tmp.vcf.gz.tmp ~{bcf_list_in}
+		fi
 	fi
 
-	if [~{min_mac_in} == 0 ]; then		
-		plink2 --vcf ~{vcf_output_in}_tmp.vcf.gz --export vcf bgz id-paste=iid --out ~{vcf_output_in} 
+	if [ ~{min_mac_in} == 0 ]; then
+		plink2 --vcf $vcf_output_in.vcf.gz.tmp --export vcf bgz id-paste=iid --out $vcf_output_in 
 	else
-		plink2 --vcf ~{vcf_output_in}_tmp.vcf.gz --mac ~{min_mac_in} --export vcf bgz id-paste=iid --out ~{vcf_output_in}
+		plink2 --vcf $vcf_output_in.vcf.gz.tmp --mac ~{min_mac_in} --export vcf bgz id-paste=iid --out $vcf_output_in
 	fi
-	}
-	output {
-		File convert_vcf = "${vcf_output_in}.vcf.gz"
-
 	}
 	runtime {
 		docker: "try/bcf_convert_vcf"
 		memory: mem_gb_in + " GB"
 		cpu: cores_in
 		disks: "local-disk " + disk_in + " SSD"
+	}
+	output {
+		File convert_vcf = glob("*.vcf.gz")[0]
+
 	}
 }
 

@@ -1,6 +1,5 @@
 {
-  "BCFConvertVCF.bcf_list": ["freeze8_5_chr22_1MB.bcf"],
-  "BCFConvertVCF.vcf_output": "freeze8_5_chr22_1MB",
+  "BCFConvertVCF.bcf_list": ["freeze8_5_chr22_1MB.bcf", "freeze8_5_chr21_0.5MB.bcf"],
   "BCFConvertVCF.filterPass": true,
   "BCFConvertVCF.min_mac": 1,
   "BCFConvertVCF.cores": 1,
