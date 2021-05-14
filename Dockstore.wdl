@@ -76,7 +76,7 @@ task convert {
 	fi
 	}
 	runtime {
-		docker: "try/bcf_convert_vcf"
+		docker: "quay.io/redaq/bcf-convert-vcf"
 		memory: mem_gb_in + " GB"
 		cpu: cores_in
 		disks: "local-disk " + disk_in + " SSD"
